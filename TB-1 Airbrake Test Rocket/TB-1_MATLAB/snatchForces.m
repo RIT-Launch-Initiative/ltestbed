@@ -22,11 +22,22 @@ conv = 0.2248089431; % Newton to pound-force
 D = main.getDiameter();
 Cd = main.getCD();
 A = (pi/4)*D^2;
-filter = eventfilter("MAIN");
-mainData = simData(filter, ["Total velocity", "Air temperature", "Air pressure"]);
-T = mainData.("Air temperature");
-P = mainData.("Air pressure")/1000;
+
+% run sim
+mainData = openrocket.simulate(sim,outputs = ["Total velocity", "Air temperature", "Air pressure"]);
+
+% trim data
+data_range = timerange(eventfilter("LAUNCHROD"), eventfilter("APOGEE"), "openleft");
+mainData = mainData(data_range, :);
+
+% assign data points. now there is probably a better way to grab the end
+% point but I forget its been a min
+T = (mainData.("Air temperature")); 
+T = T(end);
+P = mainData.("Air pressure")/1000; 
+P = P(end);
 v = mainData.("Total velocity");
+v = v(end);
 F_snatch1 = snatchCalc(Cd, A, v, P, T);
 
 %% Find Drogue Snatch Force
