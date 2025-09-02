@@ -23,15 +23,12 @@ D = main.getDiameter();
 Cd = main.getCD();
 A = (pi/4)*D^2;
 
-% run sim
-mainData = openrocket.simulate(sim,outputs = ["Total velocity", "Air temperature", "Air pressure"]);
-
 % trim data
-data_range = timerange(eventfilter("LAUNCHROD"), eventfilter("APOGEE"), "openleft");
-mainData = mainData(data_range, :);
+data_range = timerange(eventfilter("LAUNCHROD"), eventfilter("MAIN"), "openleft");
+mainData = simData(data_range, :);
 
-% assign data points. now there is probably a better way to grab the end
-% point but I forget its been a min
+% Assign data points
+% Kyle method
 T = (mainData.("Air temperature")); 
 T = T(end);
 P = mainData.("Air pressure")/1000; 
@@ -51,6 +48,11 @@ T = drogueData.("Air temperature");
 P = drogueData.("Air pressure")/1000;
 v = drogueData.("Total velocity");
 F_snatch2 = snatchCalc(Cd, A, v, P, T);
+
+%% Display output
+disp("Main snatch: " + F_snatch1/1000 + " [kN], " + F_snatch1*conv + " [lbf]"...
+    + newline + "Drogue snatch: " + F_snatch2/1000 + " [kN], "...
+    + F_snatch2*conv + " [lbf]")
 
 %% Calculator Function
 % Arguments are drag coefficient, reference area, airspeed, pressure,
