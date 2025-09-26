@@ -1,18 +1,18 @@
 %% FIN OPTIMIZATION 
 % Created by Ares Bustinza-Nguyen
-% Updated: 9/15/2025 by Juno Afko
+% Updated: 3/18/2025
 
 clear; close all;
 
 %% SETTING FLIGHT CONDITIONS, CONSTRAINTS ---------------------------------
 
-rocket_path = "C:\ltestbed\TB-1 Airbrake Test Rocket\TB-1.ork"; 
+rocket_path = "C:\IREC-2026-Systems\Rocket Files\IREC-2026-4U.ork"; 
 if ~isfile(rocket_path)
     error("Error: not on path", rocket_path);
 end
 
 rocket = openrocket(rocket_path);
-sim = rocket.sims("15mph_URRG");
+sim = rocket.sims("15mph-Midland-N3300");
  
 fins = rocket.component(class = "FinSet"); 
 if ~isscalar(fins)
@@ -31,14 +31,14 @@ cost_tracking = [];
 %% OPTIMIZATION
 
 % calling the setup function and creating a var to pass into fminsearch
-absolute_cost = costfunc_setup(rocket, sim, fins, "Nose Cone Weight", f, t);
+absolute_cost = costfunc_setup(rocket, sim, fins, "Adjustable stability weight", f, t);
 
 % initatilzing 
 init_Ls = fins.getSweep();
 init_Lt = fins.getTipChord();
 init_Lr = fins.getRootChord();
 init_h = fins.getHeight();
-init_n = rocket.component(name = "Nose Cone Weight").getComponentMass();
+init_n = rocket.component(name = "Adjustable stability weight").getComponentMass();
 
 starting_vals = [init_Ls, init_Lt, init_Lr, init_h, init_n];
 
@@ -62,7 +62,7 @@ fins.setSweep(opt_params(1));
 fins.setTipChord(opt_params(2));
 fins.setRootChord(opt_params(3));
 fins.setHeight(opt_params(4));
-rocket.component(name = "Nose Cone Weight").setComponentMass(opt_params(5));
+rocket.component(name = "Adjustable stability weight").setComponentMass(opt_params(5));
 
 sim.getOptions().setWindTurbulenceIntensity(0);
 simdata = openrocket.simulate(sim, outputs = "ALL");
@@ -113,15 +113,17 @@ function func = costfunc_setup(rocket, sim, fins, opt_var, f, t)
     opt_mass = rocket.component(name = opt_var); 
 
     % set targets for mission parameters
-    target_stbL = 1.4; 
-    target_stbB = 3.0; 
-    target_FOS = 1.5; 
+    target_apg = 3352.8; 
+    target_stbL = 1.55; 
+    target_stbB = 3.6; 
+    target_FOS = 1.54; 
 
     % define weights for each, modifies how the function behaves and affects the weight of the cost value
     % [greater number = more lenient above target, greater numer = less lenient below target]
-    weights_stbL = [1.5, 0.03];
-    weights_stbB = [0.015, 0.05];
-    weights_FOS = [0.1, 0.1];
+    weights_apg = [2, 0.5];
+    weights_stbL = [2.4, 0.3];
+    weights_stbB = [0.5, 0.5];
+    weights_FOS = [0.6, 0.5];
     
     func = @cost;
 
@@ -144,6 +146,10 @@ function func = costfunc_setup(rocket, sim, fins, opt_var, f, t)
         
         % can change so you're only pulling necessary
         simdata = rocket.simulate(sim, outputs = "ALL");
+        
+        % apogee calculation
+        apogee = max(simdata.Altitude); 
+        %apogee = simdata{eventfilter("APOGEE"), "Altitude"};
 
         % stability (want to make this calculation for time save, might not be necessary)
         data_range = timerange(eventfilter("LAUNCHROD"), eventfilter("BURNOUT"), "openleft");
@@ -155,11 +161,16 @@ function func = costfunc_setup(rocket, sim, fins, opt_var, f, t)
         fos_calc = f(simdata, fins);
 
         % deltas for all mission parameters
+        delta_apg = (apogee/target_apg) * 100;
         delta_stbL = (stb_launchrod/target_stbL) * 100;
         delta_stbB = (stb_burnout/target_stbB) * 100;
         delta_FOS = (fos_calc/target_FOS) * 100;
         
         penalty = 0;
+
+        if delta_apg < 98 
+            penalty = penalty + 100;
+        end
 
         if fins.getThickness() <= 0 || fins.getSweep() <= 0 || fins.getTipChord() <= 0 || fins.getRootChord() <= 0 || fins.getHeight() <= 0 || opt_mass.getComponentMass() < 0
             penalty = penalty + 100;
@@ -169,23 +180,19 @@ function func = costfunc_setup(rocket, sim, fins, opt_var, f, t)
             penalty = penalty + 100;
         end
 
-        if (fins.getRootChord() - fins.getTipChord()) < 0
-            penalty = penalty + 500;
-        end
-
-        if fins.getSweep() < 0.12
-            penalty = penalty + 1000;
-        end
+        % if fins.getSweep() < 0.12
+        %     penalty = penalty + 1000;
+        % end
 
         % function penalizes heavily if negative and less harshly if positive.
+        apg_err = abs(-weights_apg(1) * (delta_apg - 100)^2 * (exp (-weights_apg(2) * (delta_apg - 100)) - 1)); 
         stbL_err = abs(-weights_stbL(1) * (delta_stbL - 100)^2 * (exp (-weights_stbL(2) * (delta_stbL - 100)) - 1)); 
         stbB_err = abs(-weights_stbB(1) * (delta_stbB - 100)^2 * (exp (weights_stbB(2) * (delta_stbB - 100)) - 1)); 
-        FOS_err = abs(-weights_FOS(1) * (delta_FOS - 100)^2 * (exp (-weights_FOS(2) * (delta_FOS - 100)) - 1));
-        weight_err = 100*opt_mass.getComponentMass()^2;
+        FOS_err = abs(-weights_FOS(1) * (delta_FOS - 100)^2 * (exp (-weights_FOS(2) * (delta_FOS - 100)) - 1)); 
    
-        cost_value = stbL_err + stbB_err + FOS_err + weight_err + penalty;
+        cost_value = apg_err + stbL_err + stbB_err + FOS_err + penalty;
         
-        % debug purposes
+        %d ebug purposes
         global cost_tracking
         cost_tracking(end + 1) = cost_value;
     end
