@@ -11,7 +11,7 @@ end
 TB1 = openrocket(filePath);
 % "15mph_URRG", "15mph_URRG_K455", and "15mph_URRG_L935" are valid currently
 simName = "15mph_URRG";
-sim = TB1.sims("15mph_URRG");
+sim = TB1.sims(simName);
 opts = sim.getOptions();
 windBounds = [1.5 6.5]; % [min max] [m/s]
 windRange = windBounds(2)-windBounds(1);
