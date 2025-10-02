@@ -15,7 +15,7 @@ sim = TB1.sims("15mph_URRG");
 opts = sim.getOptions();
 windBounds = [1.5 6.5]; % [min max] [m/s]
 windRange = windBounds(2)-windBounds(1);
-tempBounds = [260 295]; % [K]
+tempBounds = [260 300]; % [K]
 tempRange = tempBounds(2)-tempBounds(1);
 pressBounds = [90 100]*10^3; % [Pa]
 pressRange = pressBounds(2) - pressBounds(1);
@@ -63,9 +63,10 @@ fprintf("\n   Launch Temperature: %2.1f to %2.1f [Celcius]; %2.1f to %2.1f [Fahr
 fprintf("\n   Launch Pressure: %4.2f to %4.2f [kPa]",...
     pressBounds(1), pressBounds(2));
 fprintf("\nISA used for atmosphere model");
+fprintf("\n2 sigma bounds");
 
 fprintf("\n\nApogee (geometric): %4.1f [m] +/- %3.1f [m]\n", avgAlt, 2*sigAlt);
 fprintf("Apogee (indicated): %4.1f [m] +/- %3.1f [m]\n", avgPressAlt, 2*sigPressAlt);
 fprintf("Apogee error: %2.1f [m] +/- %2.1f [m]\n", avgErr, 2*sigErr);
 
-fprintf("\nAirbrake apogee reduction = %2.1f sigma\n", (appReduction/sigAlt));
+fprintf("\nAirbrake apogee reduction of %3.0f [m] corresponds to %2.1f sigma\n", appReduction, (appReduction/sigAlt));
