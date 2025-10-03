@@ -20,9 +20,13 @@ tempRange = tempBounds(2)-tempBounds(1);
 pressBounds = [90 100]*10^3; % [Pa]
 pressRange = pressBounds(2) - pressBounds(1);
 appReduction = 248;
+% Use air data
+airDataFilePath = "C:\ltestbed\TB-1 Airbrake Test Rocket\TB-1_MATLAB\atmosphereData\08-Feb-2025-10.00.00-urrg-gfs_1.mat";
+airdata = importdata(airDataFilePath);
+airdata.TMP = airdata.TMP + 273.15; % conv Celcius to Kelvin
 
 %% Monte Carlo Loop
-N = 200; % Number of samples
+N = 300; % Number of samples
 apogeeList = zeros([N,1]);
 pressAppList = zeros([N,1]);
 elapsed = tic;
@@ -35,11 +39,13 @@ for i = 1:N
     opts.setWindSpeedAverage(wind);
     opts.setLaunchTemperature(temp);
     opts.setLaunchPressure(press);
-    TB1.simulate(sim);
+    TB1.simulate(sim, atmos = airdata(:, ["HGT", "PRES", "TMP"]));
     altData = openrocket.get_data(sim, [("Altitude"), ("Air pressure")]);
     apogeeList(i) = max(altData.("Altitude"));
     pressAppList(i) = pressalt("m", min(altData.("Air pressure")), "Pa")-pressalt("m", altData.("Air pressure")(1), "Pa");
 end
+fprintf("\nRun time:\n %4.2f minutes\n\n", toc(elapsed)/60);
+
 %% Analysis
 appErr = pressAppList - apogeeList; % Supposed measurement error
 % Averages
@@ -56,13 +62,13 @@ tempsF = (tempBounds-273)*1.8 + 32;
 pressBounds = pressBounds*10^-3;
 %% Output
 fprintf("\n%d Simulations run varying parameters in the listed ranges", N);
-fprintf("\n   Wind Speed: %1.0f to %1.0f [m/s]; %2.0f to %2.0f [mph]",...
+fprintf("\n   Wind Speed: %1.1f to %1.1f [m/s]; %2.0f to %2.0f [mph]",...
     windBounds(1), windBounds(2), windBounds(1)*C1, windBounds(2)*C1);
 fprintf("\n   Launch Temperature: %2.1f to %2.1f [Celcius]; %2.1f to %2.1f [Fahrenheit]",...
     tempBounds(1)-273, tempBounds(2)-273, tempsF(1), tempsF(2));
 fprintf("\n   Launch Pressure: %4.2f to %4.2f [kPa]",...
     pressBounds(1), pressBounds(2));
-fprintf("\nISA used for atmosphere model");
+fprintf("\nGFS data for URRG on 08 Feb 2025 used for atmosphere model");
 fprintf("\n2 sigma bounds");
 
 fprintf("\n\nApogee (geometric): %4.1f [m] +/- %3.1f [m]\n", avgAlt, 2*sigAlt);
